@@ -13,10 +13,14 @@ INCLUDEPATH += \
 
 SOURCES += \
     src/main.cpp \
-    src/mainwindow.cpp
+    src/mainwindow.cpp \
+    src/microtubule.cpp \
+    src/simulationengine.cpp
 
 HEADERS += \
-    include/mainwindow.h
+    include/mainwindow.h \
+    include/microtubule.h \
+    include/simulationengine.h
 
 FORMS += \
     ui/mainwindow.ui
