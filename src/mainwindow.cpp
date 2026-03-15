@@ -40,7 +40,7 @@ void MainWindow::on_startButton_clicked()
     mtLines.clear();
     engine->initialiseAxon(10);
 
-    vector<Microtubule> mts = engine->getMts();
+    const auto& mts = engine->getMts();
 
     for (std::size_t i = 0; i < mts.size(); ++i) {
       auto& mt = mts[i];
