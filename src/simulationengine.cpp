@@ -47,6 +47,12 @@ void SimulationEngine::pause() { timer->stop(); }
 void SimulationEngine::reset() {
   // TODO: clear storage and visuals, reset timer to 0
   timer->stop();
+
+  //reset
+  time = 0.0;
+  stepCount = 0;
+  mts.clear();
+
 }
 
 void SimulationEngine::step() {

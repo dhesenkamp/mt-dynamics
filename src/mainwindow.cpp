@@ -59,7 +59,13 @@ void MainWindow::on_startButton_clicked()
 
 void MainWindow::on_pauseButton_clicked() { engine->pause(); }
 
-void MainWindow::on_resetButton_clicked() { engine->reset(); }
+void MainWindow::on_resetButton_clicked() {
+  engine->reset();
+
+  // Remove all drawn lines from scene
+  for (std::size_t i = 0; i < mtLines.size(); i++) { scene->removeItem(mtLines[i]); }
+  mtLines.clear();
+}
 
 void MainWindow::onStepCompleted() {
   // update time step on canvas
