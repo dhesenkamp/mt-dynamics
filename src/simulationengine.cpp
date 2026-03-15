@@ -1,8 +1,9 @@
 #include "simulationengine.h"
-#include "mainwindow.h"
 
 #include <random>
 #include <iostream>
+#include <QTimer>
+
 
 using namespace std;
 
@@ -43,7 +44,10 @@ void SimulationEngine::start() { timer->start(16); } // 16ms = approx 60fps
 
 void SimulationEngine::pause() { timer->stop(); }
 
-void SimulationEngine::reset() { timer->stop(); } // TODO: clear storage and visuals, reset timer to 0
+void SimulationEngine::reset() {
+  // TODO: clear storage and visuals, reset timer to 0
+  timer->stop();
+}
 
 void SimulationEngine::step() {
 
