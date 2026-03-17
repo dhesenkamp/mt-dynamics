@@ -2,13 +2,11 @@
 #define MICROTUBULE_H
 
 #include <cmath>
-#include <QGraphicsLineItem>
 
 enum class MtState {
   GROWING,
   SHRINKING,
 };
-
 
 class Microtubule {
 public:
@@ -33,6 +31,7 @@ private:
   double originX, originY;
   double currentLength;
 
+  // Unique identifier for each microtubule, used for tracking in the GUI
   static unsigned nextId;
   unsigned id;
 

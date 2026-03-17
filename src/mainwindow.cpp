@@ -26,10 +26,10 @@ MainWindow::MainWindow (QWidget *parent)
   assert(scene != nullptr);
 
   /* Chart setup
-   * Both the length histogram and the tubulin pool line chart have been created with the support of Claude.ai
-   */
+   * Both the length histogram and the tubulin pool line chart have been created 
+   * with the extensive support of Claude.ai */
 
-  // Chart 1: MT length distribution
+  // --- Chart 1: MT length distribution ---
   kdeSeries = new QLineSeries();
   kdeSeries->setName("Length density");
   QPen kdePen(Qt::cyan);
@@ -60,7 +60,7 @@ MainWindow::MainWindow (QWidget *parent)
   ui->mtLengthChart->setChart(lengthChart);
   ui->mtLengthChart->setRenderHint(QPainter::Antialiasing);
 
-  // Chart 2: tubulin pool
+  // --- Chart 2: tubulin pool ---
   freeTubulinSeries = new QLineSeries();
   freeTubulinSeries->setName("Free Tubulin");
   QPen freeTubPen(Qt::blue);
@@ -114,8 +114,8 @@ void MainWindow::on_startButton_clicked() {
    * It performs a check at the beginning, if at the start of the simulation (time = 0),
    * the axon gets seeded with a predetermined number of MTs.
    *
-   * After hitting the pause button, it will continue where it left off (hence the zero-check in the beginning)
-   */
+   * After hitting the pause button, it will continue where it left off 
+   * (hence the zero-check in the beginning) */
   if (engine->getElapsedTime() == 0) {
     getParams();
 
@@ -153,6 +153,8 @@ void MainWindow::on_resetButton_clicked() {
 }
 
 void MainWindow::getParams() {
+  /* Retrieve simulation parameters from the GUI */
+
   engine->setInitialNrMts(ui->nrMtsSpinBox->value());
   engine->setDeltaTime(ui->dtSpinBox->value());
   engine->setVGrow(ui->vGrowSpinBox->value());
@@ -166,12 +168,11 @@ void MainWindow::getParams() {
 
 void MainWindow::onStepCompleted() {
   /* This function updates visuals and tracking metrics after every step.
-   * It is called after the engine emits the "step completed signal.
-   */
+   * It is called after the engine emits the "step completed signal */
 
   const auto& mts = engine->getMts();
   double t = engine->getElapsedTime();
-  double tMin = t / 60.0;
+  double tMin = t / 60.0; // Convert time to minutes for better readability on the x-axis
   double free = engine->getFreeTubulin();
   double bound = engine->getTotalTubulin() - free;
   double boundPercentage = (bound / engine->getTotalTubulin()) * 100;
@@ -192,7 +193,7 @@ void MainWindow::onStepCompleted() {
   QSet<unsigned> currentIds;
   for (const auto& mt : mts) { currentIds.insert(mt.getId()); }
 
-  // Case 1: removing "dead" MTs from the scene
+  // --- Case 1: removing "dead" MTs from the scene ---
   auto it = mtLines.begin();
   while (it != mtLines.end()) {
     if (!currentIds.contains(it.key())) {
@@ -203,7 +204,7 @@ void MainWindow::onStepCompleted() {
     else { ++it; }
   }
 
-  // Case 2: Handle existing and new MTs
+  // --- Case 2: Handle existing and new MTs ---
   for (const auto& mt : mts) {
     // Case 2.1: Update the length of existing MTs in the scene
     if (mtLines.contains(mt.getId())) {
@@ -223,21 +224,19 @@ void MainWindow::onStepCompleted() {
     }
   }
 
-  // Update & draw MT length histogram. This part has also been written with Claude.ai
+  // Update & draw MT length histogram
   drawLengthKde();
-
 }
 
 void MainWindow::onResetCompleted() {
+  /* Once the simulation is reset, all drawn lines are removed from the scene 
+   * and the plots with respective data storages are cleared */
   for (auto* line : mtLines) {
     scene->removeItem(line);
     delete line;
   }
 
   mtLines.clear();
-
-  //ui->stepCountLabel->setText("0");
-  //ui->freeTubulinLabel->setText("0");
 
   // Reset tubulin pool chart
   freeTubulinSeries->clear();
@@ -250,26 +249,31 @@ void MainWindow::onResetCompleted() {
 }
 
 void MainWindow::drawLengthKde() {
-  // ── KDE length distribution ──
+  /* Update the kernel density estimate for MT lengths. This part is 
+   * computationally intensive and may slow down the UI. If so, reduce
+   * the resolution (number of points used for the KDE calculation) in
+   * the header file (KDE_POINTS). 
+   * This part has been written with Claude.ai */
   const auto& mts = engine->getMts();
   QVector<double> lengths;
   lengths.reserve(mts.size());
-  for (const auto& mt : mts)
-    lengths.append(mt.getEndX() - mt.getX());
+  for (const auto& mt : mts) { lengths.append(mt.getEndX() - mt.getX()); }
 
   kdeSeries->clear();
 
   if (lengths.size() >= 2) {
     // Compute mean and standard deviation
     double sum = 0.0;
-    for (double l : lengths) sum += l;
+    for (double l : lengths) { sum += l; }
     double mean = sum / lengths.size();
 
     double sq = 0.0;
-    for (double l : lengths) sq += (l - mean) * (l - mean);
+    for (double l : lengths) { sq += (l - mean) * (l - mean); }
     double stddev = std::sqrt(sq / lengths.size());
 
-    // Silverman's rule for bandwidth
+    /* Silverman's rule for bandwidth. Can be manually adjusted
+     * to decrease smoothing when expecting multi-modal distributions. 
+     * (higher h smoothes more drastically). 1.0 is a fallback. */ 
     double h = (stddev > 0)
                    ? 1.06 * stddev * std::pow(lengths.size(), -0.2)
                    : 1.0;

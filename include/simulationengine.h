@@ -7,7 +7,7 @@
 #include <memory>
 #include <random>
 #include <QObject>
-#include <QGraphicsScene>
+#include <QTimer>
 
 class SimulationEngine : public QObject
 {
@@ -16,25 +16,23 @@ class SimulationEngine : public QObject
 public:
   explicit SimulationEngine (QObject *parent = nullptr);
 
-  // controls
+  // Control functions
   void start();
   void pause();
   void reset();
 
+  // Used during setup phase to configure the simulation
   unsigned getAxonLength() const { return axonLength; }
   unsigned getAxonWidth() const { return axonWidth; }
   void initialiseAxon();
   std::vector<Microtubule>& getMts() { return mts; }
 
+  // Getters and setters for parameters
   unsigned getStepCount() { return stepCount; }
-  void increaseStepCount() { stepCount++; }
   double getElapsedTime() { return time; }
-
   double getTotalTubulin() const { return totalTubulin; }
   void setTotalTubulin(int t) { totalTubulin = t; }
   double getFreeTubulin() const { return freeTubulin; }
-  //double getCatastropeProb() const { return catastropheProb; }
-  //double getRescueProb() const { return rescueProb; }
   void setInitialNrMts(int x) { initialNrMts = x; }
   void setVGrow(double x) { vGrow = x; }
   void setVShrink(double x) { vShrink = x; }
@@ -46,8 +44,13 @@ public:
 
 private:
   QTimer *timer;
-  double dt = 1.0; // timestep, s/update
-  double time = 0.0; // biological time
+
+  /* Time step in seconds. This is a key parameter that controls the resolution 
+   * of the simulation and can be adjusted for performance vs accuracy trade-offs.
+   * Smaller = more accurate simulation but longer runtime
+   * Larger = faster simulation but less accurate and may miss important events */
+  double dt = 1.0; 
+  double time = 0.0; // Actual biological time elapsed in seconds
 
   unsigned stepCount = 0;
   unsigned axonLength = 1000;
@@ -56,7 +59,7 @@ private:
 
   std::vector<Microtubule> mts;
 
-  // rng
+  // Random number generators for various aspects of the simulation
   std::random_device rd;
   std::mt19937 gen;
   std::uniform_int_distribution<int> randomIntX; //(1, getAxonLength() - (getAxonLength() / 5));
@@ -66,14 +69,16 @@ private:
 
 
   // Biological parameters (default values, can be overwritten from GUI before running simulation)
-  double vGrow = 0.6;  // microns per second
-  double vShrink = 5.0;  // shrink velocity (positive value)
+  double vGrow = 0.6;
+  double vShrink = 5.0; // Shrink velocity (keep positive value!)
   double totalTubulin = 10000.0;
   double freeTubulin = 0.0;
   double baseCatastropheRate = 0.005;
   double rescueRate = 0.05;
-  double alpha = 0.0005; // tubulin stabilization strength
+  double alpha = 0.0005; // Tubulin stabilization parameter
   double nucleationRate = 0.1;
+
+  void increaseStepCount() { stepCount++; }
 
 signals:
   void stepCompleted();
