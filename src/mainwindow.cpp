@@ -1,3 +1,45 @@
+/* **************************
+ * *** About this program ***
+ * **************************
+ * 
+ * Author: Dennis Hesenkamp
+ * Matriculation number: 16442976
+ * 
+ * *** RESEARCH QUESTION: ***
+ * 
+ * How do tubulin availability and stochastic state transitions 
+ * regulate steady-state microtubule population dynamics in a confined axonal compartment?
+ * 
+ * *** HOW TO RUN: ***
+ * 1. Build and run the program using Qt Creator.
+ * 2. Adjust the simulation parameters on the GUI as desired.
+ * 3. Click "Start" to run the simulation, "Pause" to pause it, and "Reset" to reset it.
+ * 4. Observe the microtubule dynamics in the axon visualization and the corresponding charts.
+ *
+ * *** PARAMETERS: ***
+ * All parameters can be adjusted in the GUI before starting the simulation. Default values are provided
+ * which serve as a good starting point for observing the dynamics.
+ * 
+ * - Initial number of MTs: The number of microtubules present at the start of the simulation.
+ * - Time step (dt): The time increment for each simulation step, in seconds.
+ * - Growth velocity (vGrow): The rate at which microtubules grow.
+ * - Shrinkage velocity (vShrink): The rate at which microtubules shrink.
+ * - Base catastrophe rate: The baseline rate at which microtubules transition from growing to shrinking.
+ * - Rescue rate: The rate at which microtubules transition from shrinking to growing.
+ * - Alpha: The strength of the feedback of free tubulin on the stability of microtubules
+ * - Nucleation rate: The rate at which new microtubules are nucleated in the axon.
+ * - Total tubulin: The total amount of tubulin available in the system, which can be distributed between free and bound states.
+ *
+ * *** STRUCTURE: ***
+ * The program consists of multiple files, which are separated into include/ (.h header files) and src/ (.cpp implementation files). The main components are:
+ * - mainwindow.h/cpp: Contains the MainWindow class which manages the GUI and interacts with the SimulationEngine.
+ * - simulationengine.h/cpp: Contains the SimulationEngine class which implements the core logic of the microtubule dynamics simulation.
+ * - microtubule.h/cpp: Contains the Microtubule class which represents individual microtubules and their properties.
+ * - main.cpp: The entry point of the program which initializes the application and shows the main window.
+ * - tests/test_microtubule.pro/cpp: Contains unit test for the Microtubule::grow function (access as sub-project in Qt Creator).
+ * - README.md: Provides an overview of the project, motivation, explanations. Read for more information.
+ */
+
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include "simulationengine.h"
@@ -134,7 +176,7 @@ void MainWindow::on_startButton_clicked() {
       mtLines[mt.getId()] = scene->addLine(
         mt.getX(), mt.getY(),
         mt.getEndX(), mt.getY(),
-        QPen(Qt::white, 2)
+        QPen(Qt::gray, 2)
       );
     }
   }
@@ -219,7 +261,7 @@ void MainWindow::onStepCompleted() {
       mtLines[mt.getId()] = scene->addLine(
         mt.getX(), mt.getY(),
         mt.getEndX(), mt.getY(),
-        QPen(Qt::blue, 2)
+        QPen(Qt::darkGray, 2)
       );
     }
   }
