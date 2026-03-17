@@ -17,17 +17,25 @@ public:
   double getX() const { return originX; }
   double getY() const { return originY; }
   double getLength() const { return currentLength; }
-  unsigned getEndX() const { return originX + currentLength; } // convenience for drawing
+  double getEndX() const { return originX + currentLength; } // convenience for drawing
 
-  MtState getState() { return state; }
+  unsigned getId() const { return id; }
+
+  MtState getState() const { return state; }
   void setState(MtState s) { state = s; }
 
-  void grow(double delta);
-  void shrink(double delta);
+  void grow(double delta) { currentLength += delta; }
+  void shrink(double delta) { currentLength -= delta; }
+
+  static void resetIdCounter() { nextId = 0; }
 
 private:
   double originX, originY;
   double currentLength;
+
+  static unsigned nextId;
+  unsigned id;
+
   MtState state = MtState::GROWING;
 };
 

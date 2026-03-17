@@ -23,17 +23,26 @@ public:
 
   unsigned getAxonLength() const { return axonLength; }
   unsigned getAxonWidth() const { return axonWidth; }
-
-  void initialiseAxon(unsigned numMts);
+  void initialiseAxon();
   std::vector<Microtubule>& getMts() { return mts; }
 
   unsigned getStepCount() { return stepCount; }
   void increaseStepCount() { stepCount++; }
   double getElapsedTime() { return time; }
 
+  double getTotalTubulin() const { return totalTubulin; }
+  void setTotalTubulin(int t) { totalTubulin = t; }
   double getFreeTubulin() const { return freeTubulin; }
   //double getCatastropeProb() const { return catastropheProb; }
   //double getRescueProb() const { return rescueProb; }
+  void setInitialNrMts(int x) { initialNrMts = x; }
+  void setVGrow(double x) { vGrow = x; }
+  void setVShrink(double x) { vShrink = x; }
+  void setBaseCatRate(double x) { baseCatastropheRate = x; }
+  void setRescueRate(double x) { rescueRate = x; }
+  void setAlpha(double x) { alpha = x; }
+  void setNucRate(double x) { nucleationRate = x; }
+  void setDeltaTime(double x) { dt = x; }
 
 private:
   QTimer *timer;
@@ -42,7 +51,8 @@ private:
 
   unsigned stepCount = 0;
   unsigned axonLength = 1000;
-  unsigned axonWidth = 100;
+  unsigned axonWidth = 150;
+  unsigned initialNrMts = 50;
 
   std::vector<Microtubule> mts;
 
@@ -55,17 +65,19 @@ private:
   std::uniform_real_distribution<double> stateProb; //(0.0, 1.0);
 
 
-  // biological parameters
-  double vGrow = 0.8;  // microns per second
+  // Biological parameters (default values, can be overwritten from GUI before running simulation)
+  double vGrow = 0.6;  // microns per second
   double vShrink = 5.0;  // shrink velocity (positive value)
-  double totalTubulin = 3000.0;
+  double totalTubulin = 10000.0;
   double freeTubulin = 0.0;
   double baseCatastropheRate = 0.005;
   double rescueRate = 0.05;
-  double alpha = 0.001; // tubulin stabilization strength
+  double alpha = 0.0005; // tubulin stabilization strength
+  double nucleationRate = 0.1;
 
 signals:
   void stepCompleted();
+  void resetCompleted();
 
 private slots:
   void step();

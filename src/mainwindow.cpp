@@ -14,42 +14,127 @@ MainWindow::MainWindow (QWidget *parent)
   engine = new SimulationEngine(this);
   scene = new QGraphicsScene(this);
 
-  // set fixed boundaries for axon
+  // Fix scene boundaries to the size of the axon
   scene->setSceneRect(0, 0, engine->getAxonLength(), engine->getAxonWidth());
-
-  // draw axon boundaries
   QGraphicsRectItem *rectItem = scene->addRect(0, 0, engine->getAxonLength(), engine->getAxonWidth());
   rectItem->setPen(QPen(Qt::red));
 
   ui->graphicsView->setScene(scene);
 
+  // Make sure engine and scene are initialised
   assert(engine != nullptr);
   assert(scene != nullptr);
 
-  connect(
-    engine, &SimulationEngine::stepCompleted,
-    this,   &MainWindow::onStepCompleted
+  /* Chart setup
+   * Both the length histogram and the tubulin pool line chart have been created with the support of Claude.ai
+   */
+
+  // Chart 1: MT length distribution
+  kdeSeries = new QLineSeries();
+  kdeSeries->setName("Length density");
+  QPen kdePen(Qt::cyan);
+  kdePen.setWidth(2);
+  kdeSeries->setPen(kdePen);
+
+  lengthChart = new QChart();
+  lengthChart->addSeries(kdeSeries);
+  lengthChart->setTitle("MT Length Distribution");
+  lengthChart->setAnimationOptions(QChart::NoAnimation);
+  lengthChart->setTheme(CHART_THEME);
+  lengthChart->legend()->hide();
+
+  lengthAxisX = new QValueAxis();
+  lengthAxisX->setTitleText("Length");
+  lengthAxisX->setRange(0, KDE_MAX_LEN);
+  lengthAxisX->setLabelFormat("%.0f");
+  lengthChart->addAxis(lengthAxisX, Qt::AlignBottom);
+  kdeSeries->attachAxis(lengthAxisX);
+
+  lengthAxisY = new QValueAxis();
+  //lengthAxisY->setTitleText("Density");
+  //lengthAxisY->setRange(0, 1.0);
+  //lengthAxisY->setLabelFormat("%.1f");
+  lengthChart->addAxis(lengthAxisY, Qt::AlignLeft);
+  kdeSeries->attachAxis(lengthAxisY);
+
+  ui->mtLengthChart->setChart(lengthChart);
+  ui->mtLengthChart->setRenderHint(QPainter::Antialiasing);
+
+  // Chart 2: tubulin pool
+  freeTubulinSeries = new QLineSeries();
+  freeTubulinSeries->setName("Free Tubulin");
+  QPen freeTubPen(Qt::blue);
+  freeTubPen.setWidth(2);
+  freeTubulinSeries->setPen(freeTubPen);
+
+  boundTubulinSeries = new QLineSeries();
+  boundTubulinSeries->setName("Bound Tubulin");
+  QPen boundTubPen(Qt::green);
+  boundTubPen.setWidth(2);
+  boundTubulinSeries->setPen(boundTubPen);
+
+  QChart *tubChart = new QChart();
+  tubChart->addSeries(freeTubulinSeries);
+  tubChart->addSeries(boundTubulinSeries);
+  tubChart->setAnimationOptions(QChart::NoAnimation);
+  tubChart->setTheme(CHART_THEME);
+
+  axisX = new QValueAxis();
+  axisX->setTitleText("Time (min)");
+  axisX->setRange(0, X_AXIS_WINDOW_SIZE + 0.5);
+  axisX->setLabelFormat("%.1f");
+  tubChart->addAxis(axisX, Qt::AlignBottom);
+
+  axisY = new QValueAxis();
+  axisY->setTitleText("Tubulin Mass");
+  axisY->setLabelFormat("%.0f");
+  axisY->setRange(0, engine->getTotalTubulin());
+  tubChart->addAxis(axisY, Qt::AlignLeft);
+
+  freeTubulinSeries->attachAxis(axisX);
+  freeTubulinSeries->attachAxis(axisY);
+  boundTubulinSeries->attachAxis(axisX);
+  boundTubulinSeries->attachAxis(axisY);
+
+  ui->tubulinChart->setChart(tubChart);
+
+  ui->totalTubDisplay->setText(
+    QString::number(ui->totalTubSlider->value())
   );
+
+  // Connect signals & slots
+  connect(engine, &SimulationEngine::stepCompleted,   this, &MainWindow::onStepCompleted);
+  connect(engine, &SimulationEngine::resetCompleted,  this, &MainWindow::onResetCompleted);
 }
 
 MainWindow::~MainWindow () { delete ui; }
 
-void MainWindow::on_startButton_clicked()
-{
+void MainWindow::on_startButton_clicked() {
+  /* This function serves as the entry point in the program.
+   * It performs a check at the beginning, if at the start of the simulation (time = 0),
+   * the axon gets seeded with a predetermined number of MTs.
+   *
+   * After hitting the pause button, it will continue where it left off (hence the zero-check in the beginning)
+   */
   if (engine->getElapsedTime() == 0) {
-    mtLines.clear();
-    engine->initialiseAxon(10);
+    getParams();
 
+    // Update relevant parts of the GUI
+    ui->totalTubDisplay->setText(QString::number(engine->getTotalTubulin()));
+    axisY->setRange(0, engine->getTotalTubulin());
+
+    mtLines.clear();
+    engine->initialiseAxon();
+
+    // Get the MTs as const reference, not copy
     const auto& mts = engine->getMts();
 
-    for (std::size_t i = 0; i < mts.size(); ++i) {
-      auto& mt = mts[i];
-      mtLines.push_back(
-        scene->addLine(
-          mt.getX(), mt.getY(),
-          mt.getEndX(), mt.getY(),
-          QPen(Qt::black, 2)
-        )
+    // Draw the MTs
+    for (const auto& mt : mts) {
+      mtLines[mt.getId()] = scene->addLine(
+        mt.getX(), mt.getY(),
+        mt.getEndX(), mt.getY(),
+        QPen(Qt::white, 2)
       );
     }
   }
@@ -57,29 +142,169 @@ void MainWindow::on_startButton_clicked()
   engine->start();
 }
 
+// Simple pause functionality as the simulation otherwise runs without interruption
 void MainWindow::on_pauseButton_clicked() { engine->pause(); }
 
 void MainWindow::on_resetButton_clicked() {
+  /* Resetting calls reset for the engine (which in turn resets metrics such as time elapsed)
+   * and removes all drawn lines from the scene.
+   */
   engine->reset();
+}
 
-  // Remove all drawn lines from scene
-  for (std::size_t i = 0; i < mtLines.size(); i++) { scene->removeItem(mtLines[i]); }
-  mtLines.clear();
+void MainWindow::getParams() {
+  engine->setInitialNrMts(ui->nrMtsSpinBox->value());
+  engine->setDeltaTime(ui->dtSpinBox->value());
+  engine->setVGrow(ui->vGrowSpinBox->value());
+  engine->setVShrink(ui->vShrinkSpinBox->value());
+  engine->setBaseCatRate(ui->baseCatRateSpinBox->value());
+  engine->setRescueRate(ui->rescueRateSpinBox->value());
+  engine->setAlpha(ui->alphaSpinBox->value());
+  engine->setNucRate(ui->nucRateSpinBox->value());
+  engine->setTotalTubulin(ui->totalTubSlider->value());
 }
 
 void MainWindow::onStepCompleted() {
-  // update time step on canvas
-  ui->stepCountLabel->setText(QString::number(engine->getElapsedTime()));
+  /* This function updates visuals and tracking metrics after every step.
+   * It is called after the engine emits the "step completed signal.
+   */
 
-  // update drawings
-  auto mts = engine->getMts();
+  const auto& mts = engine->getMts();
+  double t = engine->getElapsedTime();
+  double tMin = t / 60.0;
+  double free = engine->getFreeTubulin();
+  double bound = engine->getTotalTubulin() - free;
+  double boundPercentage = (bound / engine->getTotalTubulin()) * 100;
 
-  for (std::size_t i = 0; i < mts.size(); i++) {
+  // Update the series objects for data display
+  freeTubulinSeries->append(tMin, free);
+  boundTubulinSeries->append(tMin, bound);
 
-      mtLines[i]->setLine(
-      mts[i].getX(), mts[i].getY(),
-      mts[i].getEndX(), mts[i].getY()
-    );
+  // Sliding window for the x-axis to keep relevant data in view
+  const double windowSize = X_AXIS_WINDOW_SIZE;
+  if (tMin > windowSize) { axisX->setRange(tMin - windowSize, tMin+0.5); }
+
+  // Update text fields next to the graphs
+  ui->nrMtsDisplay->setText(QString::number(mts.size()));
+  ui->boundTubDisplay->setText(QString::number(boundPercentage, 'f', 1) + " %");
+
+  // Get the unique IDs of all currently living MTs to correctly update visuals
+  QSet<unsigned> currentIds;
+  for (const auto& mt : mts) { currentIds.insert(mt.getId()); }
+
+  // Case 1: removing "dead" MTs from the scene
+  auto it = mtLines.begin();
+  while (it != mtLines.end()) {
+    if (!currentIds.contains(it.key())) {
+      scene->removeItem(it.value());
+      delete it.value(); // Also clean up memory when removing a line from the scene
+      it = mtLines.erase(it);
+    }
+    else { ++it; }
   }
-  ui->freeTubulinLabel->setText(QString::number(engine->getFreeTubulin()));
+
+  // Case 2: Handle existing and new MTs
+  for (const auto& mt : mts) {
+    // Case 2.1: Update the length of existing MTs in the scene
+    if (mtLines.contains(mt.getId())) {
+      mtLines[mt.getId()]->setLine(
+        mt.getX(), mt.getY(),
+        mt.getEndX(), mt.getY()
+      );
+    }
+
+    // Case 2.2: Draw newly nucleated MTs which are not yet part of the scene
+    else {
+      mtLines[mt.getId()] = scene->addLine(
+        mt.getX(), mt.getY(),
+        mt.getEndX(), mt.getY(),
+        QPen(Qt::blue, 2)
+      );
+    }
+  }
+
+  // Update & draw MT length histogram. This part has also been written with Claude.ai
+  drawLengthKde();
+
 }
+
+void MainWindow::onResetCompleted() {
+  for (auto* line : mtLines) {
+    scene->removeItem(line);
+    delete line;
+  }
+
+  mtLines.clear();
+
+  //ui->stepCountLabel->setText("0");
+  //ui->freeTubulinLabel->setText("0");
+
+  // Reset tubulin pool chart
+  freeTubulinSeries->clear();
+  boundTubulinSeries->clear();
+  axisX->setRange(0, 10);
+
+  // Reset length KDE
+  kdeSeries->clear();
+  lengthAxisY->setRange(0, 1000);
+}
+
+void MainWindow::drawLengthKde() {
+  // ── KDE length distribution ──
+  const auto& mts = engine->getMts();
+  QVector<double> lengths;
+  lengths.reserve(mts.size());
+  for (const auto& mt : mts)
+    lengths.append(mt.getEndX() - mt.getX());
+
+  kdeSeries->clear();
+
+  if (lengths.size() >= 2) {
+    // Compute mean and standard deviation
+    double sum = 0.0;
+    for (double l : lengths) sum += l;
+    double mean = sum / lengths.size();
+
+    double sq = 0.0;
+    for (double l : lengths) sq += (l - mean) * (l - mean);
+    double stddev = std::sqrt(sq / lengths.size());
+
+    // Silverman's rule for bandwidth
+    double h = (stddev > 0)
+                   ? 1.06 * stddev * std::pow(lengths.size(), -0.2)
+                   : 1.0;
+
+    // Evaluate KDE at KDE_POINTS evenly spaced positions
+    double step = KDE_MAX_LEN / (KDE_POINTS - 1);
+    double maxDensity = 0.0;
+    QVector<QPointF> points;
+    points.reserve(KDE_POINTS);
+
+    const double norm = 1.0 / (lengths.size() * h * std::sqrt(2.0 * M_PI));
+    for (int i = 0; i < KDE_POINTS; ++i) {
+      double x = i * step;
+      double density = 0.0;
+      for (double l : lengths) {
+        double u = (x - l) / h;
+        density += std::exp(-0.5 * u * u);
+      }
+      density *= norm;
+      maxDensity = std::max(maxDensity, density);
+      points.append({x, density});
+    }
+
+    kdeSeries->replace(points);
+    lengthAxisY->setRange(0, maxDensity * 1.1);
+  }
+
+  else {
+    // Not enough data — flat line at zero
+    kdeSeries->append(0, 0);
+    kdeSeries->append(KDE_MAX_LEN, 0);
+    lengthAxisY->setRange(0, 1.0);
+  }
+}
+
+
+
+
